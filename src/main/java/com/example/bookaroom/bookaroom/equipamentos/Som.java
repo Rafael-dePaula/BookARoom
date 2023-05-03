@@ -4,15 +4,17 @@ import java.util.Collection;
 import java.util.Set;
 
 public class Som extends Equipamento{
-    	final Set<boolean> bluetooth;
+	final boolean bluetooth;
 	final Set<String> tipo;
-	final Set<Integer> volts;
-   	static final String PREFIX = "CON";
+	final Integer volts;
 
-    public Controles(String nome, Collection<String> tipo, boolean bluetooth, Integer volts) {
+
+    public Som(String nome, Collection<String> tipo, boolean bluetooth, Integer volts) {
         super(nome);
         this.tipo = Set.copyOf(tipo);
-	  this.bluetooth= bluetooth;
-	  this.volts = volts;
+	  	this.bluetooth= bluetooth;
+	  	this.volts = volts;
     }
+
+
 }
