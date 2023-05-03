@@ -2,74 +2,86 @@ package com.example.bookaroom.bookaroom.reserva;
 
 import com.example.bookaroom.bookaroom.equipamentos.Equipamento;
 import com.example.bookaroom.bookaroom.campus.Funcionario;
-import com.example.bookaroom.bookaroom.periodo.Horario;
-import com.example.bookaroom.bookaroom.periodo.Periodo;
+import com.example.bookaroom.bookaroom.periodo.*;
 import com.example.bookaroom.bookaroom.campus.Sala;
 
 import java.io.Serializable;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
+import java.util.Objects;
 
 
 public abstract class Reserva implements Serializable {
-    private final LocalDate dataAlocacao;
-    private final LocalTime horaInicio;
-    private final LocalTime horaFim;
-    private final String assunto;
-    private final Sala sala;
-    private final Funcionario funcionario;
-    private final List<Equipamento> equipamentos;
-    protected Boolean ativa;
+    AlocacoesHorario horariosAlocados;
+    final String assunto;
+    Boolean ativa;
+    final Sala sala;
+    final Funcionario funcionario;
+    final List<Equipamento> equipamentos;
 
-    abstract public int getPrioridade();
-
-    public boolean hasOverlap(Periodo p) {
-        return getPeriodo().overlaps(p);
-    }
 
     // <editor-fold defaultstate="collapsed" desc="Constructors">
-    protected Reserva(Periodo periodo, Funcionario funcionario, Sala sala, String assunto, List<Equipamento> equipamentos) {
+    public Reserva(AlocacoesHorario horariosAlocados, Funcionario funcionario, Sala sala, String assunto, List<Equipamento> equipamentos) {
+        this.horariosAlocados = horariosAlocados;
         this.funcionario = funcionario;
         this.sala = sala;
         this.assunto = assunto;
-        this.horaInicio = periodo.inicio.toLocalTime();
-        this.horaFim = periodo.fim.toLocalTime();
-        this.dataAlocacao = periodo.inicio.toLocalDate();
         this.equipamentos = equipamentos;
-        this.ativa = false;
+        this.ativa = true;
     }
     //  </editor-fold>
 
+    abstract public TipoReserva getTipoReserva();
+
+    public int getPrioridade() {
+        return getTipoReserva().prioridade;
+    }
+
+    public AlocacoesHorario periodos() {
+        return horariosAlocados;
+    }
+
+    public boolean hasOverlap(Periodo p) {
+        Periodo nextP = periodos().getFirstOccurrenceAfter(p.inicio.toLocalDate());
+        if(nextP == null) return false;
+
+        return nextP.overlaps(p);
+    }
+
     // <editor-fold defaultstate="collapsed" desc="Getters/Setters">
 
-    public Periodo getPeriodo() {
-        return new Periodo(
-                LocalDateTime.of(dataAlocacao, horaInicio),
-                LocalDateTime.of(dataAlocacao, horaFim)
-        );
+    public Periodo getPeriodoDeAtividade() {
+        return horariosAlocados.getPeriodoTotal();
     }
 
     public LocalDate getDataAlocacao() {
-        return dataAlocacao;
+        return horariosAlocados.dataAlocacao();
+    }
+
+    public LocalDate getDataExpiracao() {
+        return horariosAlocados.dataExpiracao();
+    }
+
+    public LocalDate getData() {
+        return horariosAlocados.dataAlocacao();
     }
 
     public Horario getHorario() {
-        return new Horario(horaInicio, horaFim);
+        return new Horario(getHoraInicio(), getHoraFim());
     }
 
-    public DayOfWeek getDiaSemana() {
-        return dataAlocacao.getDayOfWeek();
+    public DiaDaSemana getDiaSemana() {
+        return DiaDaSemana.of(getDataAlocacao().getDayOfWeek());
     }
 
     public LocalTime getHoraInicio() {
-        return horaInicio;
+        return horariosAlocados.horario().inicio;
     }
 
     public LocalTime getHoraFim() {
-        return horaFim;
+        return horariosAlocados.horario().fim;
     }
 
     public String getAssunto() {
@@ -88,10 +100,21 @@ public abstract class Reserva implements Serializable {
         return equipamentos;
     }
 
-    public boolean isAtiva() {
-        return ativa;
+    public void addEquipamento(Equipamento e) {
+        equipamentos.add(e);
     }
 
+    public boolean isAtiva() {
+        return ativa && !isGone();
+    }
+
+    public void disable() {
+        ativa = false;
+    }
+
+    public boolean isGone() {
+        return LocalDateTime.now().isAfter(getPeriodoDeAtividade().fim);
+    }
 
     // </editor-fold>
 
@@ -99,23 +122,24 @@ public abstract class Reserva implements Serializable {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof Reserva reserva)) return false;
-        return getPeriodo().equals(reserva.getPeriodo()) && getSala().equals(reserva.getSala()) && getFuncionario().equals(reserva.getFuncionario());
+        return getDataAlocacao().equals(reserva.getDataAlocacao()) && getHoraInicio().equals(reserva.getHoraInicio()) && getHoraFim().equals(reserva.getHoraFim()) && getSala().equals(reserva.getSala()) && getFuncionario().equals(reserva.getFuncionario());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getPeriodo(), getSala(), getFuncionario(), getPrioridade());
+        return Objects.hash(getDataAlocacao(), getHoraInicio(), getHoraFim(), getSala(), getFuncionario(), getPrioridade());
     }
 
     @Override
     public String toString() {
-        return "Reserva{" +
-                "assunto='" + assunto + '\'' +
+        return getTipoReserva() +
+                " assunto='" + assunto + '\'' +
                 ", prioridade=" + getPrioridade() +
                 ", sala=" + sala +
                 ", funcionario=" + funcionario +
-                ", ativa=" + ativa +
-                ", periodo: "  + getDataAlocacao()  + " "  + getHorario() +
+                ", ativa=" + isAtiva() +
+                ", periodo=" + getPeriodoDeAtividade() +
+                ", dia-da-semana=" + getDiaSemana() +
                 '}';
     }
 }

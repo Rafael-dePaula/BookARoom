@@ -8,6 +8,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 
 public class Periodo implements Reservavel, Serializable {
     public static final DateTimeFormatter FORMATO_HORA = DateTimeFormatter.ofPattern("HH:mm");
@@ -23,23 +24,23 @@ public class Periodo implements Reservavel, Serializable {
     }
 
     public Periodo(String inicio, String fim) {
-        this.inicio = LocalDateTime.parse(inicio, FORMATO_DATA_HORA) ;
-        this.fim = LocalDateTime.parse(fim, FORMATO_DATA_HORA);
+        this(LocalDateTime.parse(inicio, FORMATO_DATA_HORA), LocalDateTime.parse(fim, FORMATO_DATA_HORA));
     }
 
     public Periodo(String data, String horaInicio, String horaFim) {
-        this.inicio = LocalDateTime.parse(data + " " + horaInicio, FORMATO_DATA_HORA) ;
-        this.fim = LocalDateTime.parse(data + " " + horaFim, FORMATO_DATA_HORA);
+        this(data + " " + horaInicio,data + " " + horaFim);
     }
 
     public Periodo(String dataInicio, String horaInicio, String dataFim, String horaFim) {
-        this.inicio = LocalDateTime.parse(dataInicio + " " + horaInicio, FORMATO_DATA_HORA) ;
-        this.fim = LocalDateTime.parse(dataFim + " " + horaFim, FORMATO_DATA_HORA);
+        this(dataInicio + " " + horaInicio, dataFim + " " + horaFim);
     }
 
     public Periodo(LocalDate data, LocalTime horaInicio, LocalTime horaFim) {
-        this.inicio = LocalDateTime.of(data, horaInicio);
-        this.fim = LocalDateTime.of(data, horaFim);
+        this(LocalDateTime.of(data, horaInicio), LocalDateTime.of(data, horaFim));
+    }
+
+    public static Periodo of(LocalDate data, Horario horario) {
+        return new Periodo(data, horario.inicio, horario.fim);
     }
 
     public boolean overlaps(Periodo periodo) {
@@ -58,5 +59,17 @@ public class Periodo implements Reservavel, Serializable {
             return inicio.format(FORMATO_DATA_HORA) + " - " + fim.format(FORMATO_HORA);
         }
         return inicio.format(FORMATO_DATA_HORA) + " - " + fim.format(FORMATO_DATA_HORA);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Periodo periodo)) return false;
+        return inicio.equals(periodo.inicio) && fim.equals(periodo.fim);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(inicio, fim);
     }
 }

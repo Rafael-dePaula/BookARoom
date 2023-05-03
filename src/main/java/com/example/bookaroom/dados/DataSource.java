@@ -1,8 +1,18 @@
 package com.example.bookaroom.dados;
 
+import com.example.bookaroom.bookaroom.campus.Campus;
+import com.example.bookaroom.bookaroom.campus.Predio;
+import com.example.bookaroom.bookaroom.campus.Sala;
+import com.example.bookaroom.bookaroom.equipamentos.AudioVideo;
 import com.example.bookaroom.bookaroom.equipamentos.Equipamento;
+import com.example.bookaroom.bookaroom.equipamentos.Notbook;
+import com.example.bookaroom.bookaroom.periodo.DiaDaSemana;
+import com.example.bookaroom.bookaroom.periodo.Horario;
 import com.example.bookaroom.bookaroom.periodo.Periodo;
 import com.example.bookaroom.bookaroom.campus.*;
+import com.example.bookaroom.bookaroom.periodo.Semestre;
+import com.example.bookaroom.bookaroom.reserva.Aula;
+import com.example.bookaroom.bookaroom.reserva.Reserva;
 import com.example.bookaroom.bookaroom.reserva.Reuniao;
 
 import java.io.*;
@@ -11,20 +21,14 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public final class DataSource {
-    static class Dados implements Serializable {
+    static final class Dados implements Serializable {
         public List<Campus> campi;
 
         public Dados(List<Campus> campi) {
             this.campi = campi;
-        }
-
-        public Campus getCampus(String nome) {
-            return campi.stream()
-                    .filter(campus -> campus.getNome().equals(nome))
-                    .findFirst()
-                    .orElse(null);
         }
     }
 
@@ -33,49 +37,58 @@ public final class DataSource {
     private static FileOutputStream lockFile = null;
     private static FileLock lock = null;
 
-    private static void lockWriteOperations() throws IOException {
-        lockFile = new FileOutputStream(lockPath);
-        while(lock == null) {
-            lock = lockFile.getChannel().tryLock();
-        }
-    }
-
-    private static void releaseWriteOperations() throws IOException {
-        if(lock != null && lock.isValid()) {
-            lock.release();
-        }
-        if(lockFile != null && lockFile.getChannel().isOpen()) {
-            lockFile.close();
-        }
-    }
-
-    public static Campus getCampus(String nome) {
+    private static void lockWriteOperations()  {
         try {
-            return load().getCampus(nome);
-        } catch (Exception e) {
+            lockFile = new FileOutputStream(lockPath);
+            while(lock == null) {
+                lock = lockFile.getChannel().tryLock();
+            }
+        } catch (IOException e) {
             e.printStackTrace();
-            return null;
         }
     }
 
-    public synchronized static void transaction(String campusNome, Consumer<Campus> func)  {
+    private static void releaseWriteOperations(){
         try {
-            lockWriteOperations();
+            if(lock != null && lock.isValid()) {
+                lock.release();
+            }
+            if(lockFile != null && lockFile.getChannel().isOpen()) {
+                lockFile.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
+    public synchronized static <R> R fetch(Function<List<Campus>, R> fetchFunc) {
+        lockWriteOperations();
+        try {
             Dados dados = load();
-            Campus campus = dados.getCampus(campusNome);
-
-            func.accept(campus);
-
-            save(dados);
-
-            releaseWriteOperations();
+            return fetchFunc.apply(dados.campi);
         }  catch (IllegalStateException e) {
             throw e;
         }
         catch (Exception e) {
             e.printStackTrace();
         }
+        return null;
+    }
+
+    public synchronized static void transaction(Consumer<List<Campus>> func)  {
+        lockWriteOperations();
+        try {
+            Dados dados = load();
+            func.accept(dados.campi);
+            save(dados);
+        }  catch (IllegalStateException e) {
+            throw e;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        releaseWriteOperations();
     }
 
     static synchronized Dados load() throws Exception {
@@ -88,7 +101,7 @@ public final class DataSource {
             return dados;
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
-            throw new Exception("Error on read");
+            throw e;
         }
     }
 
@@ -113,7 +126,11 @@ public final class DataSource {
         }
     }
 
-    public static void dadosIniciais() {
+    public static void resetDados() {
+
+
+
+        String nomeCampus = "MOCHELL";
 
         String AMANHA = LocalDate.now().plusDays(1).format(Periodo.FORMATO_DATA);
         Dados dados = new Dados(new ArrayList<>());
@@ -126,8 +143,12 @@ public final class DataSource {
 
         // Equipamentos
         List<Equipamento> equipamentos = new ArrayList<>();
-//        equipamentos.add(new Equipamento("Data Show", "if-ds001"));
-//        equipamentos.add(new Equipamento("Data Show", "if-ds002"));
+
+        int number = 0;
+        equipamentos.add(new AudioVideo("Datashow", List.of("hdmi")));
+        equipamentos.add(new Notbook("Datashow", "intel i1.5"));
+        equipamentos.get(0).setPatrimonio(nomeCampus + "-equip-" + ++number);
+        equipamentos.get(1).setPatrimonio(nomeCampus + "-equip-" + ++number);
 
         // Predios / Salas
         List<Sala> salasTI = List.of(
@@ -162,27 +183,34 @@ public final class DataSource {
                 new Predio("Predio3", salasPredio3)
         );
 
+        ///Semestres
+        List<Semestre> semestres = new ArrayList<>();
+        Semestre semestre = new Semestre(LocalDate.of(2023, 2, 10), LocalDate.of(2023, 7, 10), new ArrayList<>());
+        semestre.setId(nomeCampus + "_" + semestre.inicio.format(Semestre.FORMATO_MES_ANO));
+        semestres.add(semestre);
+        Semestre semestre2 = new Semestre(LocalDate.of(2023, 7, 10), LocalDate.of(2023, 12, 10), new ArrayList<>());
+        semestre2.setId(nomeCampus + "_" + semestre.inicio.format(Semestre.FORMATO_MES_ANO));
+        semestres.add(semestre2);
+
         // Reservas
         // Reservas Neila
 
         // -- Calc 1
 
-        List<Reuniao> reservas = new ArrayList<>();
+        List<Reserva> reservas = new ArrayList<>();
 
         reservas.add(new Reuniao(
                 new Periodo(AMANHA, "08:20", "09:00"),
                 neila,
                 salasTI.get(0),
-                "Calc 1",
-                new ArrayList<>()
+                "Calc 1"
         ));
 
         reservas.add(new Reuniao(
                 new Periodo(AMANHA, "15:00", "17:40"),
                 neila,
                 salasTI.get(0),
-                "Calc 1",
-                new ArrayList<>()
+                "Calc 1"
         ));
 
         // -- Matematica
@@ -190,16 +218,14 @@ public final class DataSource {
                 new Periodo(AMANHA, "09:20", "11:00"),
                 neila,
                 salasMedio.get(1),
-                "Matematica",
-                new ArrayList<>()
+                "Matematica"
         ));
 
         reservas.add(new Reuniao(
                 new Periodo(AMANHA, "11:00", "12:40"),
                 neila,
                 salasMedio.get(1),
-                "Matematica",
-                new ArrayList<>()
+                "Matematica"
         ));
 
         // Reservas Lucio
@@ -207,29 +233,40 @@ public final class DataSource {
                 new Periodo(AMANHA, "11:00", "12:40"),
                 lucio,
                 salasMedio.get(0),
-                "Banco de Dados",
-                new ArrayList<>()
+                "Banco de Dados"
+        ));
+
+        reservas.add(new Reuniao(
+                new Periodo(AMANHA, "01:00", "02:40"),
+                lucio,
+                salasMedio.get(0),
+                "Reuniao matinal"
         ));
 
         reservas.add(new Reuniao(
                 new Periodo(AMANHA, "15:20", "17:00"),
                 lucio,
                 salasTI.get(1),
-                "Banco de Dados",
-                new ArrayList<>()
+                "Banco de Dados"
         ));
 
-        Semestre semestre = new Semestre(LocalDate.of(2023, 2, 10), LocalDate.of(2023, 7, 10), List.of());
+        Aula aula = new Aula(semestre, DiaDaSemana.TERCA, new Horario("12:30", "13:00"), lucio,
+                salasMedio.get(0),
+                "Aula da terça");
+
+
 
         dados.campi.add(new Campus(
-                "MOCHELL",
+                nomeCampus,
                 "Rua 2",
                 predios,
                 funcionarios,
                 equipamentos,
                 reservas,
-                List.of(semestre)
+                semestres
                 ));
+
+        dados.campi.get(0).addReserva(aula);
 
         save(dados);
     }

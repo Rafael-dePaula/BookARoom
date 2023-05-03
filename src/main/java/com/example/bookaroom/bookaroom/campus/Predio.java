@@ -1,11 +1,8 @@
 package com.example.bookaroom.bookaroom.campus;
 
-import com.example.bookaroom.bookaroom.equipamentos.Equipamento;
-
 import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 public class Predio implements Serializable {
     private final String nome;

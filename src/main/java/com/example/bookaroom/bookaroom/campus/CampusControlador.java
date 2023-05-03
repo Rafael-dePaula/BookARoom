@@ -1,12 +1,13 @@
 package com.example.bookaroom.bookaroom.campus;
 
 import com.example.bookaroom.bookaroom.equipamentos.Equipamento;
+import com.example.bookaroom.bookaroom.periodo.DiaDaSemana;
+import com.example.bookaroom.bookaroom.periodo.Horario;
 import com.example.bookaroom.bookaroom.periodo.Periodo;
+import com.example.bookaroom.bookaroom.periodo.Semestre;
 import com.example.bookaroom.bookaroom.reserva.*;
 import com.example.bookaroom.dados.DataSource;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -17,33 +18,43 @@ public class CampusControlador {
         this.campusNome = campusNome;
     }
 
-    public BuscarReserva buscarReservas() {
-        return buscarReservas(getCampus());
+    public ReservaList buscarReservas(Reservavel ...filtros) {
+        return getCampus().getReservas(filtros);
     }
 
-    public BuscarReserva buscarReservas(Campus campus) {
-        return new BuscarReserva(campus.getReservas());
+    public ReservaList buscarReservas(Campus campus, Reservavel ...filtros) {
+        return campus.getReservas(filtros);
     }
 
     public Campus getCampus() {
-        return DataSource.getCampus(campusNome);
+        return DataSource.fetch(this::getCampus);
     }
 
-    public void updateCampus(Consumer<Campus> updateFunc) {
-        DataSource.transaction(campusNome, updateFunc);
+    private Campus getCampus(List<Campus> campi) {
+        return campi.stream()
+                .filter(campus -> campus.getNome().equals(campusNome))
+                .findFirst()
+                .orElse(null);
     }
 
-    public HashMap<Sala, Boolean> salasDisponibilidade(Periodo periodoUnico) {
-        BuscarReserva buscarReserva = buscarReservas().filtrarPor(periodoUnico);
+    private synchronized void updateCampus(Consumer<Campus> updateFunc) {
+        DataSource.transaction((campi) -> {
+            Campus campus = getCampus(campi);
+            updateFunc.accept(campus);
+        });
+    }
+
+    public HashMap<Sala, Boolean> salasDisponiveis(int prioridade, Reservavel ...filtros) {
+        ReservaList buscarReserva = buscarReservas().filtrarPor(filtros);
 
         return new HashMap<>() {{
             getCampus().getSalas().forEach(
-                    sala -> put(sala, buscarReserva.filtrarPor(sala).isEmpty()));
+                    sala -> put(sala, buscarReserva.filtrarPor(sala).podemSerSobrescritas(prioridade)));
         }};
     }
 
-    public List<Equipamento> equipamentosDisponiveis(Periodo periodoUnico) {
-        BuscarReserva buscarReserva = buscarReservas().filtrarPor(periodoUnico);
+    public List<Equipamento> equipamentosDisponiveis(Reservavel ...filtros) {
+        ReservaList buscarReserva = buscarReservas(filtros).ativas();
 
         return new ArrayList<>() {{
             getCampus().getEquipamentos().forEach(equipamento -> {
@@ -53,66 +64,41 @@ public class CampusControlador {
         }};
     }
 
-    public HashMap<Sala, List<Reserva>> reservasPorSala(Periodo periodoUnico) {
-        Campus campus = getCampus();
-        return buscarReservas(campus).filtrarPor(periodoUnico).groupBy(campus.getSalas());
-    }
-
     public Funcionario getFuncionario(String nome) {
         for(Funcionario funcionario : getCampus().getFuncionarios()) {
-            if(funcionario.getNome().equals(nome)){
+            if(funcionario.nome().equals(nome)){
                 return funcionario;
             }
         }
-
         return null;
     }
 
-    public Reuniao cadastrarReuniao(Periodo periodo, Funcionario funcionario, Sala sala, String assunto, ArrayList<Equipamento> equipamentos) throws IllegalStateException {
-        Reuniao novaReserva = new Reuniao(periodo, funcionario, sala, assunto, equipamentos);
+    public Reuniao cadastrarReuniao(Periodo periodo, Funcionario funcionario, Sala sala, String assunto) {
+        Reuniao novaReserva = new Reuniao(periodo, funcionario, sala, assunto);
 
         updateCampus(campus -> {
-            validarCadastroDeReserva(campus, novaReserva);
-            campus.getReunioes().add(novaReserva);
+            campus.addReserva(novaReserva);
         });
 
         return novaReserva;
     }
 
-    public Aula cadastrarAula(Periodo periodo, Funcionario sessionFuncionario, Sala sala, String assunto, ArrayList<Equipamento> equipamentos) {
-        Aula novaReserva = new Aula(periodo, sessionFuncionario, sala, assunto, equipamentos, LocalDate.now());
+    public Aula cadastrarAula(Semestre semestre, Horario horario, DiaDaSemana diaSemana, Funcionario funcionario, Sala sala, String assunto) {
+        Aula novaReserva = new Aula(semestre, diaSemana, horario, funcionario, sala, assunto);
 
-//        validarCadastro(novaReserva);
-//        DataSource.addReserva(novaReserva);
+        updateCampus(campus -> {
+            campus.addReserva(novaReserva);
+        });
 
         return novaReserva;
     }
 
-    public Semestre cadastrarSemestre(Semestre novoSemestre) {
-        novoSemestre.id = getCampus().getNome() + "_" + novoSemestre.inicio.format(Semestre.FORMATO_MES_ANO);
-        updateCampus(campus -> campus.getSemestres().add(novoSemestre));
-        return novoSemestre;
+    public <E extends Equipamento> E cadastrarEquipamento(E equipamento) {
+        updateCampus(campus -> campus.cadastrarEquipamento(equipamento));
+        return equipamento;
     }
 
-    private void validarCadastroDeReserva(Campus campus, Reserva reserva) throws IllegalStateException {
-        BuscarReserva buscarReserva = buscarReservas(campus).filtrarPor(reserva.getPeriodo());
-
-        if(buscarReserva.filtrarPor(reserva.getFuncionario()).hasAny()){
-            throw new IllegalStateException("Funcionario ja possui reservas nesse periodo");
-        }
-
-        List<Reserva> reservasSala = buscarReserva.filtrarPor(reserva.getSala()).get();
-
-        reservasSala.forEach(reservaSala -> {
-            if(reservaSala.getPrioridade() > reserva.getPrioridade()){
-                throw new IllegalStateException("Sala ja possui reservas com maior prioridade");
-            }
-        });
-
-        reserva.getEquipamentos().forEach(equipamento -> {
-            if(buscarReserva.filtrarPor(equipamento).hasAny()){
-                throw new IllegalStateException("Equipamento ja possui reservas nesse periodo");
-            }});
+    public void requisitarEquipamento(Reserva reserva, Equipamento equipamento) {
+        updateCampus(campus -> campus.alocarEquipamento(reserva, equipamento));
     }
-
 }

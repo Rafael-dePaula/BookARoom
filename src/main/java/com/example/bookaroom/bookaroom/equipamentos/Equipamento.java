@@ -10,13 +10,6 @@ public abstract class Equipamento implements Reservavel, Serializable {
     final String nome;
     String patrimonio = null;
 
-    // <editor-fold defaultstate="collapsed" desc="ItemReservavel">
-    @Override
-    public boolean contidoEm(Reserva reserva) {
-        return reserva.getEquipamentos().contains(this);
-    }
-    // </editor-fold>
-
     // <editor-fold defaultstate="collapsed" desc="Constructor">
     protected Equipamento(String nome) {
         this.nome = nome;
@@ -30,6 +23,18 @@ public abstract class Equipamento implements Reservavel, Serializable {
 
     public String getPatrimonio() {
         return patrimonio;
+    }
+
+    public void setPatrimonio(String patrimonio) {
+        this.patrimonio = patrimonio;
+    }
+
+    // </editor-fold>
+
+    // <editor-fold defaultstate="collapsed" desc="ItemReservavel">
+    @Override
+    public boolean contidoEm(Reserva reserva) {
+        return reserva.getEquipamentos().contains(this);
     }
     // </editor-fold>
 

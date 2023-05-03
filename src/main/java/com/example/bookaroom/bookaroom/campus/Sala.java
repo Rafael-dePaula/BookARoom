@@ -6,7 +6,7 @@ import com.example.bookaroom.bookaroom.reserva.Reservavel;
 import java.io.Serializable;
 import java.util.Objects;
 
-public class Sala implements Reservavel, Serializable {
+public class Sala implements Reservavel, Serializable, Comparable<Sala> {
     private Predio predio;
     private final String numero;
     private final Integer capacidade;
@@ -61,4 +61,8 @@ public class Sala implements Reservavel, Serializable {
         return Objects.hash(getPredio(), getNumero());
     }
 
+    @Override
+    public int compareTo(Sala o) {
+        return toString().compareTo(o.toString());
+    }
 }

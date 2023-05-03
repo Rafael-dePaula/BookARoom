@@ -2,27 +2,36 @@ package com.example.bookaroom.bookaroom.reserva;
 
 import com.example.bookaroom.bookaroom.campus.Funcionario;
 import com.example.bookaroom.bookaroom.campus.Sala;
-import com.example.bookaroom.bookaroom.equipamentos.Equipamento;
-import com.example.bookaroom.bookaroom.periodo.Periodo;
+import com.example.bookaroom.bookaroom.periodo.Semestre;
+import com.example.bookaroom.bookaroom.periodo.DiaDaSemana;
+import com.example.bookaroom.bookaroom.periodo.Horario;
+import com.example.bookaroom.bookaroom.periodo.AlocacoesHorario;
 
-import java.time.LocalDate;
-import java.util.List;
+import java.util.ArrayList;
 
-public class Aula extends ReservaRecorrente {
-    static final int PRIORIDADE = 1;
-    static final int DIAS_ENTRE_RECORRENCIAS = 7;
+public class Aula extends Reserva {
+    Semestre semestre;
 
-    public Aula(Periodo periodo, Funcionario funcionario, Sala sala, String assunto, List<Equipamento> equipamentos, LocalDate dataExpiracao) {
-        super(periodo, funcionario, sala, assunto, equipamentos, dataExpiracao);
+    public Aula(Semestre semestre, DiaDaSemana dia, Horario horario, Funcionario funcionario, Sala sala, String assunto) {
+        super(AlocacoesHorario.semanal(semestre, dia, horario), funcionario, sala, assunto, new ArrayList<>());
+        this.semestre = semestre;
     }
 
-    @Override
-    public int getPrioridade() {
-        return PRIORIDADE;
-    }
+//    public Aula(Semestre semestre, List<HorarioSemanal> horarios, Funcionario funcionario, Sala sala, String assunto) {
+//        super(AlocacoesHorario.semanal(semestre, dia, horario), funcionario, sala, assunto, new ArrayList<>());
+//        this.semestre = semestre;
+//    }
+
+//    private static List<Alocacao> criarAlocacoes(List<HorarioSemanal> horarios) {
+        // for horario in horarios
+        // data = getNextDataWithDiaSemana (Periodo)
+        // while data isBefore Periodo.fim
+        //    addAlocacao(data)
+          //
+//    }
 
     @Override
-    public int diasEntreRecorrencias() {
-        return DIAS_ENTRE_RECORRENCIAS;
+    public TipoReserva getTipoReserva() {
+        return TipoReserva.AULA;
     }
 }

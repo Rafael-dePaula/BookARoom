@@ -1,14 +1,13 @@
 package com.example.bookaroom;
+
 import com.example.bookaroom.dados.DataSource;
 import com.example.bookaroom.views.terminal.Terminal;
 
 public class Main {
     public static void main(String[] args) {
-        DataSource.dadosIniciais();
-//        Application.launch(App.class);
-        new Terminal();
+        DataSource.resetDados();
+        Terminal.run();
     }
-
 }
 
 /*

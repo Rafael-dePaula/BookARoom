@@ -2,8 +2,8 @@ package com.example.bookaroom.bookaroom.campus;
 
 
 import com.example.bookaroom.bookaroom.equipamentos.Equipamento;
-import com.example.bookaroom.bookaroom.reserva.Reserva;
-import com.example.bookaroom.bookaroom.reserva.Reuniao;
+import com.example.bookaroom.bookaroom.periodo.Semestre;
+import com.example.bookaroom.bookaroom.reserva.*;
 
 import java.io.*;
 import java.util.*;
@@ -13,8 +13,8 @@ public class Campus implements Serializable {
     private final String endereco;
     private List<Predio> predios;
     private final List<Funcionario> funcionarios;
-    private List<Equipamento> equipamentos;
-    private final List<Reuniao> reunioes;
+    private final List<Equipamento> equipamentos;
+    private final ReservaList reservas;
     private final List<Semestre> semestres;
 
     // <editor-fold defaultstate="collapsed" desc="Constructor">
@@ -24,14 +24,14 @@ public class Campus implements Serializable {
             List<Predio> predios,
             List<Funcionario> funcionarios,
             List<Equipamento> equipamentos,
-            List<Reuniao> reunioes,
+            List<Reserva> reservas,
             List<Semestre> semestres) {
         this.nome = nome;
         this.endereco = endereco;
         setPredios(predios);
         this.funcionarios = funcionarios;
         this.equipamentos = equipamentos;
-        this.reunioes = reunioes;
+        this.reservas = new ReservaList(reservas);
         this.semestres = semestres;
     }
     // </editor-fold>
@@ -55,38 +55,65 @@ public class Campus implements Serializable {
         return equipamentos;
     }
 
-    public void setEquipamentos(List<Equipamento> equipamentos) {
-        this.equipamentos = List.copyOf(equipamentos);
-    }
-
-    public List<Reuniao> getReunioes() {
-        return reunioes;
-    }
-
     public List<Semestre> getSemestres() {
         return semestres;
     }
 
     public List<Sala> getSalas() {
-        List<Sala> salas = new ArrayList<>();
-        predios.forEach(predio -> salas.addAll(predio.getSalas()));
-        return salas;
+        return new ArrayList<>() {{
+            predios.forEach(predio -> addAll(predio.getSalas()));
+        }};
     }
 
     protected void setPredios(List<Predio> predios) {
-        predios.forEach(predio -> predio.setCampus(this));
-        this.predios = predios;
+        this.predios = new ArrayList<>();
+        predios.forEach(this::addPredio);
     }
 
-    public List<Reserva> getReservas() {
-        List<Reserva> reservas = new ArrayList<>(reunioes);
-
-        semestres.forEach(semestre -> reservas.addAll(semestre.getAulas()));
-
+    public ReservaList getReservas() {
         return reservas;
     }
 
+    public ReservaList getReservas(Reservavel ...filtros) {
+        return reservas.filtrarPor(filtros);
+    }
+
+    public void addPredio(Predio predio) {
+        predio.setCampus(this);
+        predios.add(predio);
+    }
+
+    public void addReserva(Reserva reserva) {
+        validarCadastroReserva(reserva);
+        reservas.add(reserva);
+    }
+
+    public void validarCadastroReserva(Reserva reserva) {
+        ReservaList conflitos = reservas.getConflitos(reserva);
+
+        conflitos.forEach((reservaConflito) -> {
+            if(reservaConflito.getPrioridade() >= reserva.getPrioridade()) {
+                throw new IllegalStateException("Reserva tem conflitos com reservas de maior ou igual prioridade");
+            }
+        });
+
+        conflitos.forEach(Reserva::disable);
+    }
+
     // </editor-fold>
+
+    public void alocarEquipamento(Reserva reserva, Equipamento equipamento) {
+        int index = getReservas().indexOf(reserva);
+        if(index != -1) {
+            getReservas().get(index).addEquipamento(equipamento);
+        }
+    }
+
+    public void cadastrarEquipamento(Equipamento equipamento) {
+        int number = getEquipamentos().size();
+        equipamento.setPatrimonio(nome + "-equip-" + number);
+        equipamentos.add(equipamento);
+    }
 
     @Override
     public String toString() {
