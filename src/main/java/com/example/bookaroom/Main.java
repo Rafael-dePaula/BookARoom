@@ -5,7 +5,6 @@ import com.example.bookaroom.views.terminal.Terminal;
 
 public class Main {
     public static void main(String[] args) {
-        DataSource.resetDados();
         Terminal.run();
     }
 }
